@@ -1,0 +1,58 @@
+from airflow import DAG
+from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago
+
+# Define a Python function for the security task
+def security_task():
+    print("Security task triggered due to failure of task5.")
+
+# Define a simple function for task5
+def task5_function():
+    raise Exception("Task5 failed!")  # Simulate a failure
+
+default_args = {
+    'owner': 'airflow',
+    'start_date': days_ago(1),
+    'retries': 0,
+}
+
+with DAG(
+    'sequential_dag',
+    default_args=default_args,
+    schedule_interval=None,
+    catchup=False,
+) as dag:
+    
+    start = DummyOperator(task_id='start')
+    
+    task1 = DummyOperator(task_id='task1')
+    task2 = DummyOperator(task_id='task2')
+    task3 = DummyOperator(task_id='task3')
+    task4 = DummyOperator(task_id='task4')
+
+    # task5 that can fail
+    task5 = PythonOperator(
+        task_id='task5',
+        python_callable=task5_function
+    )
+
+    task6 = DummyOperator(task_id='task6')
+    task7 = DummyOperator(task_id='task7')
+    task8 = DummyOperator(task_id='task8')
+    task9 = DummyOperator(task_id='task9')
+    task10 = DummyOperator(task_id='task10')
+
+    # Define security task
+    security_task_trigger = PythonOperator(
+        task_id='security_task',
+        python_callable=security_task,
+        trigger_rule='one_failed'  # This triggers only if task5 fails
+    )
+
+    # Sequential task dependencies
+    start >> task1 >> task2 >> task3 >> task4 >> task5 >> task6 >> task7 >> task8 >> task9 >> task10
+
+    # Trigger security task if task5 fails
+    task5 >> security_task_trigger
+
